@@ -1,5 +1,4 @@
 import os
-import re
 from flask import Flask
 from threading import Thread
 from telethon import TelegramClient, events
@@ -52,7 +51,6 @@ async def start(event):
 
 ✨ Features:
 🔗 Number Lookup
-📡 TXT Auto Parser
 ⚡ Fast Responses
 🖥️ Auto Forward System
 
@@ -94,51 +92,37 @@ async def num(event):
 @user.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener(event):
 
-# IGNORE COMMAND MESSAGES
-    if event.raw_text.startswith("/"):
+    text = event.raw_text
+
+    # IGNORE COMMANDS
+    if text.startswith("/"):
         return
 
-    # ONLY TXT FILE
-    if not event.file:
+    # ONLY TARGET RESULTS
+    if "TARGET:" not in text:
         return
 
-    if not str(event.file.name).endswith(".txt"):
-        return
-
-    # DOWNLOAD TXT
-    file_path = await event.download_media()
-
-    # READ TXT
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-
-        data = f.read()
-
-    # FORMAT RESULT
-    formatted = f"""
-🖥️ NEW SESSION CAPTURED 🖥️
-
-{data}
-
-⚡ Powered By ZShadow
-"""
-
-    # SEND TO LAST USER
+    # SEND RESULT
     if pending_requests:
 
         last_user = list(
             pending_requests.keys()
         )[-1]
 
+        formatted = f"""
+🖥️ NEW SESSION CAPTURED 🖥️
+
+{text}
+
+⚡ Powered By ZShadow
+"""
+
         await bot.send_message(
             last_user,
             formatted
         )
 
-    # DELETE FILE
-    os.remove(file_path)
-
-   #Flask Code
-
+# FLASK WEB SERVER
 app = Flask(__name__)
 
 @app.route("/")
