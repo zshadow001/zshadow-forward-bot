@@ -89,6 +89,10 @@ async def num(event):
 @user.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener(event):
 
+# IGNORE COMMAND MESSAGES
+    if event.raw_text.startswith("/"):
+        return
+
     # ONLY TXT FILE
     if not event.file:
         return
