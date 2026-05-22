@@ -90,6 +90,94 @@ async def num(event):
         f"/num {query}"
     )
 
+# /ip command
+@bot.on(
+    events.NewMessage(
+        pattern=r"/ip (.+)",
+        func=lambda e: e.is_private
+    )
+)
+async def ip(event):
+
+    query = event.pattern_match.group(1)
+
+    user_id = event.sender_id
+
+    pending_requests[user_id] = query
+
+    await event.reply("🔍 Searching IP...")
+
+    await user.send_message(
+        GROUP_ID,
+        f"/ip {query}"
+    )
+
+# /adhar command
+@bot.on(
+    events.NewMessage(
+        pattern=r"/adhar (.+)",
+        func=lambda e: e.is_private
+    )
+)
+async def adhar(event):
+
+    query = event.pattern_match.group(1)
+
+    user_id = event.sender_id
+
+    pending_requests[user_id] = query
+
+    await event.reply("🔍 Searching Adhar...")
+
+    await user.send_message(
+        GROUP_ID,
+        f"/adhar {query}"
+    )
+
+# /family command
+@bot.on(
+    events.NewMessage(
+        pattern=r"/family (.+)",
+        func=lambda e: e.is_private
+    )
+)
+async def family(event):
+
+    query = event.pattern_match.group(1)
+
+    user_id = event.sender_id
+
+    pending_requests[user_id] = query
+
+    await event.reply("🔍 Searching Family Data...")
+
+    await user.send_message(
+        GROUP_ID,
+        f"/family {query}"
+    )
+
+# /insta command
+@bot.on(
+    events.NewMessage(
+        pattern=r"/insta (.+)",
+        func=lambda e: e.is_private
+    )
+)
+async def insta(event):
+
+    query = event.pattern_match.group(1)
+
+    user_id = event.sender_id
+
+    pending_requests[user_id] = query
+
+    await event.reply("🔍 Searching Instagram Data...")
+
+    await user.send_message(
+        GROUP_ID,
+        f"/insta {query}"
+    )
+
 # LISTEN GROUP
 @user.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener(event):
