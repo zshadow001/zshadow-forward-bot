@@ -66,7 +66,12 @@ async def start(event):
     await event.reply(msg)
 
 # /num command
-@bot.on(events.NewMessage(pattern=r"/num (.+)"))
+@bot.on(
+    events.NewMessage(
+        pattern=r"/num (.+)",
+        func=lambda e: e.is_private
+    )
+)
 async def num(event):
 
     query = event.pattern_match.group(1)
