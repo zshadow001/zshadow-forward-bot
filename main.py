@@ -1,4 +1,6 @@
 import os
+import json
+import re
 from flask import Flask
 from threading import Thread
 from telethon import TelegramClient, events
@@ -44,10 +46,10 @@ async def start(event):
 👋 Hello {first} {last}
 
 ╔════════════════════════════╗
-       🖥️ 𝚉 𝚂𝙷𝙰𝙳𝙾𝚆 𝚃𝚁𝙰𝙲𝙴 🖥️
+       🕵️ 𝚉 𝚂𝙷𝙰𝙳𝙾𝚆 𝙸𝙽𝚃𝙴𝙻 🕵️
 ╚════════════════════════════╝
 
-⚡ Welcome to the ultimate tracking system
+⚡ Welcome To ZShadow Intel System
 
 ✨ Features:
 🔗 Number Lookup
@@ -102,20 +104,65 @@ async def group_listener(event):
     if "TARGET:" not in text:
         return
 
+    try:
+
+        json_match = re.search(
+            r'(\{.*\})',
+            text,
+            re.DOTALL
+        )
+
+        if not json_match:
+            return
+
+        parsed = json.loads(
+            json_match.group(1)
+        )
+
+        records = parsed["result"]["data"]
+
+        result_text = """
+╔════════════════════╗
+     🕵️ Z SHADOW INTEL
+╚════════════════════╝
+"""
+
+        for i, item in enumerate(records[:3], start=1):
+
+            result_text += f"""
+
+🔍 RECORD {i}
+━━━━━━━━━━━━━━━━━━
+👤 NAME     ➤ {item.get("NAME", "N/A")}
+📞 MOBILE   ➤ {item.get("MOBILE", "N/A")}
+🌐 CIRCLE   ➤ {item.get("circle", "N/A")}
+🏠 ADDRESS  ➤ {item.get("ADDRESS", "N/A")}
+🆔 ID       ➤ {item.get("id", "N/A")}
+📧 EMAIL    ➤ {item.get("email", "N/A")}
+"""
+
+        result_text += """
+
+━━━━━━━━━━━━━━━━━━
+⚡ Powered By ZShadow
+"""
+
+        formatted = result_text
+
+    except Exception:
+
+        formatted = f"""
+⚠ Failed To Parse Data
+
+{text}
+"""
+
     # SEND RESULT
     if pending_requests:
 
         last_user = list(
             pending_requests.keys()
         )[-1]
-
-        formatted = f"""
-🖥️ NEW SESSION CAPTURED 🖥️
-
-{text}
-
-⚡ Powered By ZShadow
-"""
 
         await bot.send_message(
             last_user,
@@ -127,7 +174,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "ZShadow Bot Running 😎"
+    return "ZShadow Intel Running 😎"
 
 def run_web():
 
@@ -147,7 +194,7 @@ async def main():
 
     await start_user()
 
-    print("ZShadow Bot Running 😎")
+    print("ZShadow Intel Running 😎")
 
     await bot.run_until_disconnected()
 
