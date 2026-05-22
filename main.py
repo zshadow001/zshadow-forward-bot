@@ -128,20 +128,8 @@ async def group_listener(event):
     # DELETE FILE
     os.remove(file_path)
 
-# START EVERYTHING
-async def main():
+   #Flask Code
 
-    await start_user()
-
-    print("ZShadow Bot Running 😎")
-
-    await bot.run_until_disconnected()
-
-with bot:
-
-    bot.loop.run_until_complete(
-        main()
-    )
 app = Flask(__name__)
 
 @app.route("/")
@@ -160,3 +148,18 @@ def run_web():
     )
 
 Thread(target=run_web).start()
+
+# START EVERYTHING
+async def main():
+
+    await start_user()
+
+    print("ZShadow Bot Running 😎")
+
+    await bot.run_until_disconnected()
+
+with bot:
+
+    bot.loop.run_until_complete(
+        main()
+    )
