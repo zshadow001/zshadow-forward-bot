@@ -1,5 +1,7 @@
 import os
 import re
+from flask import Flask
+from threading import Thread
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 
@@ -140,3 +142,21 @@ with bot:
     bot.loop.run_until_complete(
         main()
     )
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "ZShadow Bot Running 😎"
+
+def run_web():
+
+    port = int(
+        os.environ.get("PORT", 10000)
+    )
+
+    app.run(
+        host="0.0.0.0",
+        port=port
+    )
+
+Thread(target=run_web).start()
