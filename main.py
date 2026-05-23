@@ -27,8 +27,8 @@ user = TelegramClient(
     API_HASH
 )
 
-# STORE LAST USER
-last_user_id = None
+# STORE LAST QUERY
+last_query = None
 
 # START USER CLIENT
 async def start_user():
@@ -74,11 +74,11 @@ async def start(event):
 )
 async def num(event):
 
-    global last_user_id
+    global last_query
 
     query = event.pattern_match.group(1)
 
-    last_user_id = event.sender_id
+    last_query = query
 
     await event.reply(
         "🔍 Searching..."
@@ -94,7 +94,7 @@ async def num(event):
 @user.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener(event):
 
-    global last_user_id
+    global last_query
 
     text = event.raw_text
 
@@ -104,6 +104,10 @@ async def group_listener(event):
 
     # IGNORE COMMANDS
     if text.startswith("/"):
+        return
+
+    # ONLY OUR SEARCH RESULT
+    if last_query not in text:
         return
 
     # ONLY VALID RESULT
@@ -140,33 +144,23 @@ async def group_listener(event):
 ╚════════════════════╝
 """
 
-        added = set()
+        count = 1
 
-        for i, item in enumerate(records, start=1):
-
-            mobile = item.get("MOBILE", "N/A")
-
-            # REMOVE DUPLICATES
-            if mobile in added:
-                continue
-
-            added.add(mobile)
+        for item in records:
 
             result_text += f"""
 
-🔍 RECORD {i}
+🔍 RECORD {count}
 ━━━━━━━━━━━━━━━━━━
 👤 NAME     ➤ {item.get("NAME", "N/A")}
-📞 MOBILE   ➤ {mobile}
+📞 MOBILE   ➤ {item.get("MOBILE", "N/A")}
 🌐 CIRCLE   ➤ {item.get("circle", "N/A")}
 🏠 ADDRESS  ➤ {item.get("ADDRESS", "N/A")}
 🆔 ID       ➤ {item.get("id", "N/A")}
 📧 EMAIL    ➤ {item.get("email", "N/A")}
 """
 
-            # LIMIT 3 RECORDS
-            if len(added) >= 3:
-                break
+            count += 1
 
         result_text += """
 
@@ -175,12 +169,10 @@ async def group_listener(event):
 """
 
         # SEND ONLY FORMATTED RESULT
-        if last_user_id:
-
-            await bot.send_message(
-                last_user_id,
-                result_text
-            )
+        await bot.send_message(
+            event.chat_id,
+            result_text
+        )
 
     except Exception as e:
 
