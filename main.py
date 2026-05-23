@@ -68,12 +68,7 @@ async def start(event):
     await event.reply(msg)
 
 # /num command
-@bot.on(
-    events.NewMessage(
-        incoming=True,
-        pattern=r"^/num (.+)"
-    )
-)
+@bot.on(events.NewMessage(pattern=r"/num (.+)"))
 async def num(event):
 
     global last_query
@@ -83,17 +78,21 @@ async def num(event):
     if not event.is_private:
         return
 
-    query = event.pattern_match.group(1)
-
-    # UNIQUE REQUEST
-    current = f"{event.sender_id}:{query}"
-
-    # IGNORE DUPLICATE
-    if last_query == current:
+    # IGNORE BOT SELF EVENTS
+    if event.out:
         return
 
-    # SAVE REQUEST
-    last_query = current
+    query = event.pattern_match.group(1)
+
+    # IGNORE DUPLICATE
+    if (
+        last_query == query
+        and last_user_id == event.sender_id
+    ):
+        return
+
+    # SAVE
+    last_query = query
     last_user_id = event.sender_id
 
     # SEARCHING MESSAGE
@@ -135,8 +134,7 @@ async def group_listener(event):
     if not last_query:
         return
 
-    # GET QUERY
-    query = last_query.split(":")[1]
+    query = last_query
 
     # ONLY OUR RESULT
     if query not in text:
