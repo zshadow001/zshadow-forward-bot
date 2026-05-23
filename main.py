@@ -27,8 +27,9 @@ user = TelegramClient(
     API_HASH
 )
 
-# STORE LAST QUERY
+# STORE LAST SEARCH
 last_query = None
+last_user_id = None
 
 # START USER CLIENT
 async def start_user():
@@ -75,10 +76,12 @@ async def start(event):
 async def num(event):
 
     global last_query
+    global last_user_id
 
     query = event.pattern_match.group(1)
 
     last_query = query
+    last_user_id = event.sender_id
 
     await event.reply(
         "🔍 Searching..."
@@ -95,6 +98,7 @@ async def num(event):
 async def group_listener(event):
 
     global last_query
+    global last_user_id
 
     text = event.raw_text
 
@@ -106,7 +110,10 @@ async def group_listener(event):
     if text.startswith("/"):
         return
 
-    # ONLY OUR SEARCH RESULT
+    # ONLY OUR SEARCH
+    if not last_query:
+        return
+
     if last_query not in text:
         return
 
@@ -168,11 +175,15 @@ async def group_listener(event):
 ⚡ Powered By ZShadow
 """
 
-        # SEND ONLY FORMATTED RESULT
+        # SEND RESULT TO USER
         await bot.send_message(
-            event.chat_id,
+            last_user_id,
             result_text
         )
+
+        # RESET
+        last_query = None
+        last_user_id = None
 
     except Exception as e:
 
