@@ -31,7 +31,6 @@ user = TelegramClient(
 last_query = None
 last_user_id = None
 last_text = None
-searching_sent = False
 
 # START USER CLIENT
 async def start_user():
@@ -71,32 +70,35 @@ async def start(event):
 # /num command
 @bot.on(
     events.NewMessage(
-        pattern=r"/num (.+)",
-        func=lambda e: e.is_private and not e.out
+        incoming=True,
+        pattern=r"^/num (.+)"
     )
 )
 async def num(event):
 
     global last_query
     global last_user_id
-    global searching_sent
+
+    # ONLY PRIVATE
+    if not event.is_private:
+        return
 
     query = event.pattern_match.group(1)
 
+    # IGNORE FAST DUPLICATE
+    if (
+        last_query == query
+        and last_user_id == event.sender_id
+    ):
+        return
+
     last_query = query
     last_user_id = event.sender_id
-    searching_sent = False
 
-    # SEND SEARCHING ONLY ONCE
-    if not searching_sent:
-
-        searching_sent = True
-
-        if not event.out:
-
-            await event.reply(
-                "🔍 Searching..."
-            )
+    # SEARCHING MESSAGE
+    await event.reply(
+        "🔍 Searching..."
+    )
 
     # SEND TO OFFICIAL GROUP
     await user.send_message(
@@ -111,7 +113,6 @@ async def group_listener(event):
     global last_query
     global last_user_id
     global last_text
-    global searching_sent
 
     text = event.raw_text
 
@@ -119,7 +120,7 @@ async def group_listener(event):
     if not text:
         return
 
-    # IGNORE DUPLICATES
+    # IGNORE DUPLICATE EVENTS
     if text == last_text:
         return
 
@@ -203,7 +204,6 @@ async def group_listener(event):
         # RESET
         last_query = None
         last_user_id = None
-        searching_sent = False
 
     except Exception as e:
 
