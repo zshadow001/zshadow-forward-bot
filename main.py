@@ -27,7 +27,7 @@ user = TelegramClient(
     API_HASH
 )
 
-# STORE LAST SEARCH
+# STORE LAST REQUEST
 last_query = None
 last_user_id = None
 last_text = None
@@ -85,14 +85,15 @@ async def num(event):
 
     query = event.pattern_match.group(1)
 
-    # IGNORE FAST DUPLICATE
-    if (
-        last_query == query
-        and last_user_id == event.sender_id
-    ):
+    # UNIQUE REQUEST
+    current = f"{event.sender_id}:{query}"
+
+    # IGNORE DUPLICATE
+    if last_query == current:
         return
 
-    last_query = query
+    # SAVE REQUEST
+    last_query = current
     last_user_id = event.sender_id
 
     # SEARCHING MESSAGE
@@ -130,14 +131,18 @@ async def group_listener(event):
     if text.startswith("/"):
         return
 
-    # ONLY OUR SEARCH
+    # NO ACTIVE SEARCH
     if not last_query:
         return
 
-    if last_query not in text:
+    # GET QUERY
+    query = last_query.split(":")[1]
+
+    # ONLY OUR RESULT
+    if query not in text:
         return
 
-    # ONLY VALID RESULT
+    # VALID RESULT ONLY
     if (
         "TARGET:" not in text
         or '"result"' not in text
