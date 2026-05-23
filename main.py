@@ -30,6 +30,7 @@ user = TelegramClient(
 # STORE LAST SEARCH
 last_query = None
 last_user_id = None
+last_text = None
 
 # START USER CLIENT
 async def start_user():
@@ -99,12 +100,19 @@ async def group_listener(event):
 
     global last_query
     global last_user_id
+    global last_text
 
     text = event.raw_text
 
     # IGNORE EMPTY
     if not text:
         return
+
+    # IGNORE DUPLICATE EVENTS
+    if text == last_text:
+        return
+
+    last_text = text
 
     # IGNORE COMMANDS
     if text.startswith("/"):
