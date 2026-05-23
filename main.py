@@ -1,112 +1,103 @@
 import os
 import json
 import re
+import asyncio
 from flask import Flask
 from threading import Thread
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 
-# ENV VARIABLES
+# ENV
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 STRING_SESSION = os.getenv("STRING_SESSION")
 GROUP_ID = int(os.getenv("GROUP_ID"))
 
-# BOT CLIENT
+# CLIENTS
 bot = TelegramClient(
     "bot",
     API_ID,
     API_HASH
-).start(bot_token=BOT_TOKEN)
+)
 
-# USER CLIENT
 user = TelegramClient(
     StringSession(STRING_SESSION),
     API_ID,
     API_HASH
 )
 
-# STORE LAST REQUEST
+# STORE
 last_query = None
 last_user_id = None
 last_text = None
 
-# START USER CLIENT
-async def start_user():
+# START USER
+async def start_clients():
 
+    await bot.start(bot_token=BOT_TOKEN)
     await user.start()
 
 # /start
 @bot.on(events.NewMessage(pattern="/start"))
 async def start(event):
 
-    first = event.sender.first_name or ""
-    last = event.sender.last_name or ""
+    name = event.sender.first_name or "User"
 
-    msg = f"""
-👋 Hello {first} {last}
+    text = f"""
+👋 Hello {name}
 
 ╔════════════════════════════╗
-       🕵️ 𝚉 𝚂𝙷𝙰𝙳𝙾𝚆 𝙸𝙽𝚃𝙴𝙻 🕵️
+       🕵️ Z SHADOW INTEL 🕵️
 ╚════════════════════════════╝
 
-⚡ Welcome To ZShadow Intel System
+⚡ Welcome To ZShadow Intel
 
-✨ Features:
-🔗 Number Lookup
-⚡ Fast Responses
-🖥️ Auto Forward System
-
-📌 Available Commands
+📌 Commands
 
 /num ➜ Search Number
 
 ⚡ Powered By ZShadow
 """
 
-    await event.reply(msg)
+    await event.reply(text)
 
-# /num command
+# /num
 @bot.on(events.NewMessage(pattern=r"/num (.+)"))
 async def num(event):
 
     global last_query
     global last_user_id
 
-    # ONLY PRIVATE
+    # PRIVATE ONLY
     if not event.is_private:
         return
 
-    # IGNORE BOT SELF EVENTS
+    # IGNORE SELF
     if event.out:
         return
 
-    query = event.pattern_match.group(1)
+    query = event.pattern_match.group(1).strip()
 
-    # IGNORE DUPLICATE
+    # DUPLICATE BLOCK
     if (
         last_query == query
         and last_user_id == event.sender_id
     ):
         return
 
-    # SAVE
     last_query = query
     last_user_id = event.sender_id
 
-    # SEARCHING MESSAGE
-    await event.reply(
-        "🔍 Searching..."
-    )
+    await event.reply("🔍 Searching...")
 
-    # SEND TO OFFICIAL GROUP
+    # SEND TO GROUP
     await user.send_message(
         GROUP_ID,
         f"/num {query}"
     )
 
-# LISTEN GROUP
+# GROUP LISTENER
 @user.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener(event):
 
@@ -116,11 +107,10 @@ async def group_listener(event):
 
     text = event.raw_text
 
-    # IGNORE EMPTY
     if not text:
         return
 
-    # IGNORE DUPLICATE EVENTS
+    # DUPLICATE BLOCK
     if text == last_text:
         return
 
@@ -130,21 +120,18 @@ async def group_listener(event):
     if text.startswith("/"):
         return
 
-    # NO ACTIVE SEARCH
+    # NO SEARCH
     if not last_query:
         return
 
-    query = last_query
-
     # ONLY OUR RESULT
-    if query not in text:
+    if last_query not in text:
         return
 
-    # VALID RESULT ONLY
+    # VALID RESULT
     if (
         "TARGET:" not in text
         or '"result"' not in text
-        or '"data"' not in text
     ):
         return
 
@@ -168,31 +155,27 @@ async def group_listener(event):
         if not records:
             return
 
-        result_text = """
+        result = """
 ╔════════════════════╗
      🕵️ Z SHADOW INTEL
 ╚════════════════════╝
 """
 
-        count = 1
+        for i, item in enumerate(records, start=1):
 
-        for item in records:
+            result += f"""
 
-            result_text += f"""
-
-🔍 RECORD {count}
+🔍 RECORD {i}
 ━━━━━━━━━━━━━━━━━━
-👤 NAME     ➤ {item.get("NAME", "N/A")}
-📞 MOBILE   ➤ {item.get("MOBILE", "N/A")}
-🌐 CIRCLE   ➤ {item.get("circle", "N/A")}
-🏠 ADDRESS  ➤ {item.get("ADDRESS", "N/A")}
-🆔 ID       ➤ {item.get("id", "N/A")}
-📧 EMAIL    ➤ {item.get("email", "N/A")}
+👤 NAME ➤ {item.get("NAME", "N/A")}
+📞 MOBILE ➤ {item.get("MOBILE", "N/A")}
+🌐 CIRCLE ➤ {item.get("circle", "N/A")}
+🏠 ADDRESS ➤ {item.get("ADDRESS", "N/A")}
+🆔 ID ➤ {item.get("id", "N/A")}
+📧 EMAIL ➤ {item.get("email", "N/A")}
 """
 
-            count += 1
-
-        result_text += """
+        result += """
 
 ━━━━━━━━━━━━━━━━━━
 ⚡ Powered By ZShadow
@@ -201,7 +184,7 @@ async def group_listener(event):
         # SEND RESULT
         await bot.send_message(
             last_user_id,
-            result_text
+            result
         )
 
         # RESET
@@ -212,7 +195,7 @@ async def group_listener(event):
 
         print("PARSE ERROR:", e)
 
-# FLASK WEB SERVER
+# FLASK
 app = Flask(__name__)
 
 @app.route("/")
@@ -232,17 +215,16 @@ def run_web():
 
 Thread(target=run_web).start()
 
-# START EVERYTHING
+# MAIN
 async def main():
 
-    await start_user()
+    await start_clients()
 
     print("ZShadow Intel Running 😎")
 
-    await bot.run_until_disconnected()
-
-with bot:
-
-    bot.loop.run_until_complete(
-        main()
+    await asyncio.gather(
+        bot.run_until_disconnected(),
+        user.run_until_disconnected()
     )
+
+asyncio.run(main())
