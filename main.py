@@ -71,7 +71,7 @@ async def start(event):
 @bot.on(
     events.NewMessage(
         pattern=r"/num (.+)",
-        func=lambda e: e.is_private
+        func=lambda e: e.is_private and not e.out
     )
 )
 async def num(event):
