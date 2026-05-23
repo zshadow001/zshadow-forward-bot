@@ -27,8 +27,8 @@ user = TelegramClient(
     API_HASH
 )
 
-# STORE REQUESTS
-pending_requests = {}
+# STORE LAST USER
+last_user_id = None
 
 # START USER CLIENT
 async def start_user():
@@ -74,11 +74,11 @@ async def start(event):
 )
 async def num(event):
 
+    global last_user_id
+
     query = event.pattern_match.group(1)
 
-    user_id = event.sender_id
-
-    pending_requests[user_id] = query
+    last_user_id = event.sender_id
 
     await event.reply(
         "🔍 Searching..."
@@ -94,14 +94,24 @@ async def num(event):
 @user.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener(event):
 
+    global last_user_id
+
     text = event.raw_text
+
+    # IGNORE EMPTY
+    if not text:
+        return
 
     # IGNORE COMMANDS
     if text.startswith("/"):
         return
 
-    # ONLY VALID RESULTS
-    if "TARGET:" not in text:
+    # ONLY VALID RESULT
+    if (
+        "TARGET:" not in text
+        or '"result"' not in text
+        or '"data"' not in text
+    ):
         return
 
     try:
@@ -121,25 +131,42 @@ async def group_listener(event):
 
         records = parsed["result"]["data"]
 
+        if not records:
+            return
+
         result_text = """
 ╔════════════════════╗
      🕵️ Z SHADOW INTEL
 ╚════════════════════╝
 """
 
-        for i, item in enumerate(records[:3], start=1):
+        added = set()
+
+        for i, item in enumerate(records, start=1):
+
+            mobile = item.get("MOBILE", "N/A")
+
+            # REMOVE DUPLICATES
+            if mobile in added:
+                continue
+
+            added.add(mobile)
 
             result_text += f"""
 
 🔍 RECORD {i}
 ━━━━━━━━━━━━━━━━━━
 👤 NAME     ➤ {item.get("NAME", "N/A")}
-📞 MOBILE   ➤ {item.get("MOBILE", "N/A")}
+📞 MOBILE   ➤ {mobile}
 🌐 CIRCLE   ➤ {item.get("circle", "N/A")}
 🏠 ADDRESS  ➤ {item.get("ADDRESS", "N/A")}
 🆔 ID       ➤ {item.get("id", "N/A")}
 📧 EMAIL    ➤ {item.get("email", "N/A")}
 """
+
+            # LIMIT 3 RECORDS
+            if len(added) >= 3:
+                break
 
         result_text += """
 
@@ -147,27 +174,17 @@ async def group_listener(event):
 ⚡ Powered By ZShadow
 """
 
-        formatted = result_text
+        # SEND ONLY FORMATTED RESULT
+        if last_user_id:
 
-    except Exception:
+            await bot.send_message(
+                last_user_id,
+                result_text
+            )
 
-        formatted = f"""
-⚠ Failed To Parse Data
+    except Exception as e:
 
-{text}
-"""
-
-    # SEND RESULT
-    if pending_requests:
-
-        last_user = list(
-            pending_requests.keys()
-        )[-1]
-
-        await bot.send_message(
-            last_user,
-            formatted
-        )
+        print("PARSE ERROR:", e)
 
 # FLASK WEB SERVER
 app = Flask(__name__)
