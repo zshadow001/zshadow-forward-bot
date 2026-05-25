@@ -27,6 +27,12 @@ user = TelegramClient(
     API_HASH
 )
 
+# STORE
+last_query = None
+last_chat_id = None
+last_text = None
+search_msg = None
+
 # AUTO DELETE
 async def auto_delete(msg, seconds):
 
@@ -36,11 +42,6 @@ async def auto_delete(msg, seconds):
         await msg.delete()
     except:
         pass
-
-# STORE
-last_query = None
-last_chat_id = None
-last_text = None
 
 # START CLIENTS
 async def start_clients():
@@ -78,6 +79,7 @@ async def num(event):
 
     global last_query
     global last_chat_id
+    global search_msg
 
     # IGNORE OFFICIAL GROUP
     if event.chat_id == GROUP_ID:
@@ -100,16 +102,16 @@ async def num(event):
     last_query = query
     last_chat_id = event.chat_id
 
-# SEARCHING
-search_msg = await event.reply(
-    "🔍 Searching..."
-)
+    # SEARCHING MESSAGE
+    search_msg = await event.reply(
+        "🔍 Searching..."
+    )
 
-# SEND TO OFFICIAL GROUP
-await user.send_message(
-    GROUP_ID,
-    f"/num {query}"
-)
+    # SEND TO OFFICIAL GROUP
+    await user.send_message(
+        GROUP_ID,
+        f"/num {query}"
+    )
 
 # GROUP LISTENER
 @user.on(events.NewMessage(chats=GROUP_ID))
@@ -118,6 +120,7 @@ async def group_listener(event):
     global last_query
     global last_chat_id
     global last_text
+    global search_msg
 
     text = event.raw_text
 
@@ -143,35 +146,6 @@ async def group_listener(event):
     if last_query not in text:
         return
 
-    # INVALID RESULT
-    if (
-        "TARGET:" not in text
-        or '"result"' not in text
-    ):
-
-        await bot.send_message(
-            last_chat_id,
-            """
-╔════════════════════╗
-     🕵️ Z SHADOW INTEL
-╚════════════════════╝
-
-⚠ SEARCH FAILED
-
-❌ No matching records found
-📡 Server returned empty response
-
-━━━━━━━━━━━━━━━━━━
-⚡ Powered By ZShadow
-"""
-        )
-
-        # RESET
-        last_query = None
-        last_chat_id = None
-
-        return
-
     try:
 
         # EXTRACT JSON
@@ -182,6 +156,28 @@ async def group_listener(event):
         )
 
         if not json_match:
+
+            fail_msg = await bot.send_message(
+                last_chat_id,
+                """
+╔════════════════════╗
+     🕵️ Z SHADOW INTEL
+╚════════════════════╝
+
+⚠ SEARCH FAILED
+
+❌ No matching records found
+📡 Server returned empty response
+
+━━━━━━━━━━━━━━━━━━
+⚡ Powered By ZShadow 😎
+"""
+            )
+
+            asyncio.create_task(
+                auto_delete(fail_msg, 60)
+            )
+
             return
 
         parsed = json.loads(
@@ -196,7 +192,7 @@ async def group_listener(event):
 
         if not records:
 
-            await bot.send_message(
+            fail_msg = await bot.send_message(
                 last_chat_id,
                 """
 ╔════════════════════╗
@@ -209,8 +205,12 @@ async def group_listener(event):
 📡 Server returned empty response
 
 ━━━━━━━━━━━━━━━━━━
-⚡ Powered By ZShadow
+⚡ Powered By ZShadow 😎
 """
+            )
+
+            asyncio.create_task(
+                auto_delete(fail_msg, 60)
             )
 
             return
@@ -235,31 +235,32 @@ async def group_listener(event):
 📧 EMAIL ➤ {item.get("email", "N/A")}
 """
 
-result += """
+        result += """
 
-Powered By Zshadow 😎
+━━━━━━━━━━━━━━━━━━
+⚡ Powered By ZShadow 😎
 
 ━━━━━━━━━━━━━━━━━━
 ⚠ For safety reasons,
 this message will auto delete in 1 minute 😎
 """
 
-# SEND RESULT
-result_msg = await bot.send_message(
-    last_chat_id,
-    result
-)
+        # SEND RESULT
+        result_msg = await bot.send_message(
+            last_chat_id,
+            result
+        )
 
-# DELETE SEARCH MSG
-try:
-    await search_msg.delete()
-except:
-    pass
+        # DELETE SEARCH MESSAGE
+        try:
+            await search_msg.delete()
+        except:
+            pass
 
-# AUTO DELETE RESULT
-asyncio.create_task(
-    auto_delete(result_msg, 60)
-)
+        # AUTO DELETE RESULT
+        asyncio.create_task(
+            auto_delete(result_msg, 60)
+        )
 
         # RESET
         last_query = None
@@ -269,7 +270,7 @@ asyncio.create_task(
 
         print("PARSE ERROR:", e)
 
-        await bot.send_message(
+        fail_msg = await bot.send_message(
             last_chat_id,
             """
 ╔════════════════════╗
@@ -282,8 +283,12 @@ asyncio.create_task(
 📡 Invalid or broken data received
 
 ━━━━━━━━━━━━━━━━━━
-⚡ Powered By ZShadow
+⚡ Powered By ZShadow 😎
 """
+        )
+
+        asyncio.create_task(
+            auto_delete(fail_msg, 60)
         )
 
         # RESET
