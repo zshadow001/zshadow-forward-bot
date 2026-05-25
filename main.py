@@ -27,12 +27,22 @@ user = TelegramClient(
     API_HASH
 )
 
+# AUTO DELETE
+async def auto_delete(msg, seconds):
+
+    await asyncio.sleep(seconds)
+
+    try:
+        await msg.delete()
+    except:
+        pass
+
 # STORE
 last_query = None
-last_user_id = None
+last_chat_id = None
 last_text = None
 
-# START USER
+# START CLIENTS
 async def start_clients():
 
     await bot.start(bot_token=BOT_TOKEN)
@@ -67,13 +77,13 @@ async def start(event):
 async def num(event):
 
     global last_query
-    global last_user_id
+    global last_chat_id
 
-    # PRIVATE ONLY
-    if not event.is_private:
+    # IGNORE OFFICIAL GROUP
+    if event.chat_id == GROUP_ID:
         return
 
-    # IGNORE SELF
+    # IGNORE BOT SELF
     if event.out:
         return
 
@@ -82,16 +92,19 @@ async def num(event):
     # DUPLICATE BLOCK
     if (
         last_query == query
-        and last_user_id == event.sender_id
+        and last_chat_id == event.chat_id
     ):
         return
 
+    # SAVE
     last_query = query
-    last_user_id = event.sender_id
+    last_chat_id = event.chat_id
 
-    await event.reply("🔍 Searching...")
-
-    # SEND TO GROUP
+    # SEARCHING
+search_msg = await event.reply(
+    "🔍 Searching..."
+)
+    # SEND TO OFFICIAL GROUP
     await user.send_message(
         GROUP_ID,
         f"/num {query}"
@@ -102,11 +115,12 @@ async def num(event):
 async def group_listener(event):
 
     global last_query
-    global last_user_id
+    global last_chat_id
     global last_text
 
     text = event.raw_text
 
+    # EMPTY
     if not text:
         return
 
@@ -120,7 +134,7 @@ async def group_listener(event):
     if text.startswith("/"):
         return
 
-    # NO SEARCH
+    # NO ACTIVE SEARCH
     if not last_query:
         return
 
@@ -128,15 +142,38 @@ async def group_listener(event):
     if last_query not in text:
         return
 
-    # VALID RESULT
+    # INVALID RESULT
     if (
         "TARGET:" not in text
         or '"result"' not in text
     ):
+
+        await bot.send_message(
+            last_chat_id,
+            """
+╔════════════════════╗
+     🕵️ Z SHADOW INTEL
+╚════════════════════╝
+
+⚠ SEARCH FAILED
+
+❌ No matching records found
+📡 Server returned empty response
+
+━━━━━━━━━━━━━━━━━━
+⚡ Powered By ZShadow
+"""
+        )
+
+        # RESET
+        last_query = None
+        last_chat_id = None
+
         return
 
     try:
 
+        # EXTRACT JSON
         json_match = re.search(
             r'(\{.*\})',
             text,
@@ -150,9 +187,31 @@ async def group_listener(event):
             json_match.group(1)
         )
 
-        records = parsed["result"]["data"]
+        # SUPPORT BOTH TYPES
+        records = parsed.get("result", {}).get("data")
 
         if not records:
+            records = parsed.get("result")
+
+        if not records:
+
+            await bot.send_message(
+                last_chat_id,
+                """
+╔════════════════════╗
+     🕵️ Z SHADOW INTEL
+╚════════════════════╝
+
+⚠ SEARCH FAILED
+
+❌ No matching records found
+📡 Server returned empty response
+
+━━━━━━━━━━━━━━━━━━
+⚡ Powered By ZShadow
+"""
+            )
+
             return
 
         result = """
@@ -175,25 +234,60 @@ async def group_listener(event):
 📧 EMAIL ➤ {item.get("email", "N/A")}
 """
 
-        result += """
+result += """
+
+Powered By Zshadow 😎
 
 ━━━━━━━━━━━━━━━━━━
-⚡ Powered By ZShadow
+⚠ For safety reasons,
+this message will auto delete in 1 minute 😎
 """
 
-        # SEND RESULT
-        await bot.send_message(
-            last_user_id,
-            result
-        )
+# SEND RESULT
+result_msg = await bot.send_message(
+    last_chat_id,
+    result
+)
+
+# DELETE SEARCH MSG
+try:
+    await search_msg.delete()
+except:
+    pass
+
+# AUTO DELETE RESULT
+asyncio.create_task(
+    auto_delete(result_msg, 60)
+)
 
         # RESET
         last_query = None
-        last_user_id = None
+        last_chat_id = None
 
     except Exception as e:
 
         print("PARSE ERROR:", e)
+
+        await bot.send_message(
+            last_chat_id,
+            """
+╔════════════════════╗
+     🕵️ Z SHADOW INTEL
+╚════════════════════╝
+
+⚠ SEARCH FAILED
+
+❌ Unable to parse server response
+📡 Invalid or broken data received
+
+━━━━━━━━━━━━━━━━━━
+⚡ Powered By ZShadow
+"""
+        )
+
+        # RESET
+        last_query = None
+        last_chat_id = None
 
 # FLASK
 app = Flask(__name__)
