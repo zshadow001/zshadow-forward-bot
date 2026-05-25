@@ -100,15 +100,16 @@ async def num(event):
     last_query = query
     last_chat_id = event.chat_id
 
-    # SEARCHING
+# SEARCHING
 search_msg = await event.reply(
     "🔍 Searching..."
 )
-    # SEND TO OFFICIAL GROUP
-    await user.send_message(
-        GROUP_ID,
-        f"/num {query}"
-    )
+
+# SEND TO OFFICIAL GROUP
+await user.send_message(
+    GROUP_ID,
+    f"/num {query}"
+)
 
 # GROUP LISTENER
 @user.on(events.NewMessage(chats=GROUP_ID))
