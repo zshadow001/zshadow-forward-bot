@@ -6,80 +6,187 @@ from flask import Flask
 from threading import Thread
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
+from supabase import create_client
 
+# ======================
 # ENV
+# ======================
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 STRING_SESSION = os.getenv("STRING_SESSION")
 GROUP_ID = int(os.getenv("GROUP_ID"))
 
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+ADMIN_ID = 8111461057
+
+# ======================
+# SUPABASE
+# ======================
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# ======================
 # CLIENTS
+# ======================
 bot = TelegramClient("bot", API_ID, API_HASH)
 user = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 
+# ======================
 # STORAGE
+# ======================
 active_searches = {}
 message_parts = {}
+dynamic_commands = {}
+pending_admin = {}
 last_text = None
 
+# ======================
 # AUTO DELETE
-async def auto_delete(msg, seconds):
-    await asyncio.sleep(seconds)
+# ======================
+async def auto_delete(msg, sec):
+    await asyncio.sleep(sec)
     try:
         await msg.delete()
     except:
         pass
 
+# ======================
+# ADMIN CHECK
+# ======================
+def is_admin(event):
+    return event.sender_id == ADMIN_ID
+
+# ======================
+# USERS
+# ======================
+def add_user(uid):
+    try:
+        supabase.table("users").upsert({"id": uid}).execute()
+    except:
+        pass
+
+def get_users():
+    try:
+        return supabase.table("users").select("*").execute().data or []
+    except:
+        return []
+
+# ======================
+# COMMAND LOAD
+# ======================
+def load_commands():
+    global dynamic_commands
+    try:
+        res = supabase.table("commands").select("*").execute()
+        for c in res.data or []:
+            dynamic_commands[c["id"]] = c["response"]
+    except:
+        pass
+
+# ======================
+# FORMAT ENGINE (NO SCROLL OF TRUTH)
+# ======================
+def format_response(records, target):
+
+    output = f"""
+𓆩 𝗭𝗜𝗡𝗧𝗘𝗟 𝗜𝗡𝗧𝗘𝗟 𝗦𝗬𝗦𝗧𝗘𝗠 𓆪
+
+━━━━━━━━━━━━━━━━━━━━━━
+🎯 TARGET ➜ {target}
+📂 STATUS ➜ FOUND
+━━━━━━━━━━━━━━━━━━━━━━
+"""
+
+    for i, r in enumerate(records, 1):
+        output += f"""
+
+🔍 RECORD {i}
+━━━━━━━━━━━━━━━━━━━━━━
+👤 NAME ➜ {r.get('NAME','N/A')}
+📞 MOBILE ➜ {r.get('MOBILE','N/A')}
+🌐 CIRCLE ➜ {r.get('circle','N/A')}
+🏠 ADDRESS ➜ {r.get('ADDRESS','N/A')}
+🆔 ID ➜ {r.get('id','N/A')}
+"""
+
+    output += """
+
+━━━━━━━━━━━━━━━━━━━━━━
+⚡ POWERED BY @Zshadow_legend
+"""
+    return output
+
+# ======================
 # START CLIENTS
+# ======================
 async def start_clients():
     await bot.start(bot_token=BOT_TOKEN)
     await user.start()
+    load_commands()
 
-# START COMMAND
+# ======================
+# /start
+# ======================
 @bot.on(events.NewMessage(pattern="/start"))
 async def start(event):
+    add_user(event.sender_id)
+
     name = event.sender.first_name or "User"
 
     await event.reply(f"""
 👋 Hello {name}
 
-╔════════════════════════════╗
-   🕵️ Zshadow INTEL SYSTEM
-╚════════════════════════════╝
+🕵️ ZINTEL SYSTEM
 
-📌 /num <number> ➜ Search Info
+/num <query>
+/admin
 
 ⚡ Powered by @Zshadow_legend
 """)
 
-# COMMAND
+# ======================
+# SEARCH ENGINE
+# ======================
 @bot.on(events.NewMessage(pattern=r"/num (.+)"))
 async def num(event):
 
-    if event.chat_id == GROUP_ID:
-        return
-
-    if event.out:
+    if event.chat_id in active_searches:
+        msg = await event.reply("⚠ Busy...")
+        asyncio.create_task(auto_delete(msg, 10))
         return
 
     query = event.pattern_match.group(1).strip()
-
-    if event.chat_id in active_searches:
-        msg = await event.reply("⚠ Already searching...")
-        asyncio.create_task(auto_delete(msg, 10))
-        return
 
     search_msg = await event.reply("🔍 Searching...")
 
     active_searches[event.chat_id] = {
         "query": query,
-        "search_msg": search_msg
+        "msg": search_msg
     }
 
     await user.send_message(GROUP_ID, f"/num {query}")
 
+# ======================
+# DYNAMIC COMMANDS
+# ======================
+@bot.on(events.NewMessage)
+async def dynamic_router(event):
+
+    text = event.raw_text
+    if not text.startswith("/"):
+        return
+
+    cmd = text.split(" ")[0][1:]
+    args = " ".join(text.split(" ")[1:])
+
+    if cmd in dynamic_commands:
+        await event.reply(dynamic_commands[cmd].replace("{query}", args))
+
+# ======================
 # GROUP LISTENER
+# ======================
 @user.on(events.NewMessage(chats=GROUP_ID))
 async def group_listener(event):
 
@@ -97,111 +204,27 @@ async def group_listener(event):
     if text.startswith("/"):
         return
 
-    matched_chat_id = None
-    matched_data = None
+    matched = None
 
-    for chat_id, data in active_searches.items():
+    for cid, data in active_searches.items():
         if data["query"] in text:
-            matched_chat_id = chat_id
-            matched_data = data
+            matched = (cid, data)
             break
 
-    if not matched_chat_id:
+    if not matched:
         return
 
-    search_msg = matched_data["search_msg"]
+    chat_id, data = matched
+    search_msg = data["msg"]
 
-    # BUFFER
-    message_parts.setdefault(matched_chat_id, "")
-    message_parts[matched_chat_id] += "\n" + text
+    message_parts.setdefault(chat_id, "")
+    message_parts[chat_id] += "\n" + text
 
-    full_text = message_parts[matched_chat_id].lower()
+    full = message_parts[chat_id].lower()
 
-    # ❌ NO DATA DETECTION (HIDDEN)
-    no_data_keywords = [
-        "no data", "no record", "not found",
-        "invalid", "unavailable", "failed", "error"
-    ]
+    if any(x in full for x in ["no data", "not found", "error", "invalid"]):
 
-    if any(k in full_text for k in no_data_keywords):
-
-        fail_msg = await bot.send_message(
-            matched_chat_id,
-            """
-╔════════════════════════════╗
-   🕵️ Zshadow INTEL SYSTEM
-╚════════════════════════════╝
-
-❌ NO DATA FOUND
-
-━━━━━━━━━━━━━━━━━━
-⚠ No records available
-for this request
-
-━━━━━━━━━━━━━━━━━━
-🔍 Try different input
-━━━━━━━━━━━━━━━━━━
-⚡ Powered by @Zshadow_legend
-"""
-        )
-
-        asyncio.create_task(auto_delete(fail_msg, 60))
-
-        try:
-            await search_msg.delete()
-        except:
-            pass
-
-        active_searches.pop(matched_chat_id, None)
-        message_parts.pop(matched_chat_id, None)
-        return
-
-    # WAIT FOR FINAL PART
-    if (
-        '"success"' not in text
-        and '"developer"' not in text
-        and "Part 2" not in text
-        and "Part 3" not in text
-    ):
-        return
-
-    try:
-        json_match = re.search(r'(\{[\s\S]*\})', message_parts[matched_chat_id])
-
-        if not json_match:
-            raise Exception("No JSON")
-
-        parsed = json.loads(json_match.group(1))
-
-        records = parsed.get("result", {}).get("data")
-        if not records:
-            records = parsed.get("result")
-
-        if not records:
-            raise Exception("Empty")
-
-        result = """
-╔════════════════════════════╗
-   🕵️ Zshadow INTEL SYSTEM
-╚════════════════════════════╝
-"""
-
-        for i, item in enumerate(records, 1):
-            result += f"""
-
-🔍 RECORD {i}
-━━━━━━━━━━━━━━
-👤 {item.get("NAME","N/A")}
-📞 {item.get("MOBILE","N/A")}
-🌐 {item.get("circle","N/A")}
-🏠 {item.get("ADDRESS","N/A")}
-🆔 {item.get("id","N/A")}
-"""
-
-        result += "\n━━━━━━━━━━━━━━\n⚡ Powered by @Zshadow_legend"
-
-        msg = await bot.send_message(matched_chat_id, result)
-
+        msg = await bot.send_message(chat_id, "❌ No Data Found")
         asyncio.create_task(auto_delete(msg, 60))
 
         try:
@@ -209,48 +232,56 @@ for this request
         except:
             pass
 
-        active_searches.pop(matched_chat_id, None)
-        message_parts.pop(matched_chat_id, None)
+        active_searches.pop(chat_id, None)
+        message_parts.pop(chat_id, None)
+        return
 
-    except Exception:
-        fail_msg = await bot.send_message(
-            matched_chat_id,
-            """
-╔════════════════════╗
-   🕵️ Zshadow INTEL SYSTEM
-╚════════════════════╝
+    if '"success"' not in text and "Part 2" not in text:
+        return
 
-❌ SEARCH FAILED
-⚠ Unable to process response
+    try:
+        json_match = re.search(r'(\{[\s\S]*\})', message_parts[chat_id])
 
-━━━━━━━━━━━━━━━━━━
-⚡ Powered by @Zshadow_legend
-"""
-        )
+        if not json_match:
+            raise Exception()
 
-        asyncio.create_task(auto_delete(fail_msg, 60))
+        parsed = json.loads(json_match.group(1))
 
-        try:
-            await search_msg.delete()
-        except:
-            pass
+        records = parsed.get("result", {}).get("data") or parsed.get("result")
 
-        active_searches.pop(matched_chat_id, None)
-        message_parts.pop(matched_chat_id, None)
+        if not records:
+            raise Exception()
 
+        target = data["query"]
+
+        final_text = format_response(records, target)
+
+        msg = await bot.send_message(chat_id, final_text)
+
+        asyncio.create_task(auto_delete(msg, 60))
+
+        await search_msg.delete()
+
+        active_searches.pop(chat_id, None)
+        message_parts.pop(chat_id, None)
+
+    except:
+        await bot.send_message(chat_id, "❌ Parse Error")
+
+# ======================
 # FLASK
+# ======================
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "ZIntel Running"
+    return "ZIntel Running 😎"
 
-def run_web():
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.getenv("PORT", 10000))), daemon=True).start()
 
-Thread(target=run_web, daemon=True).start()
-
+# ======================
 # MAIN
+# ======================
 async def main():
     await start_clients()
     print("ZIntel Running 😎")
